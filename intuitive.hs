@@ -1,75 +1,15 @@
 import Text.ParserCombinators.ReadP
 
-isVovel :: Char -> Bool
-isVovel c =
-  c `elem` "aouei"
-
-vovel :: ReadP Char
-vovel =
-  satisfy isVovel
-
-uppercaseWord :: ReadP String
-uppercaseWord = do
-  word <- many1 (satisfy (\x -> x `elem` ['A'..'Z']))
-  satisfy (==' ')
-  return word
-
-
-
-windInfo :: ReadP (Int, Int, Maybe Int)
-windInfo = do
-    direction <- numbers 3
-    speed <- numbers 2 <|> numbers 3
-    gusts <- option Nothing (fmap Just gustParser)
-    unit <- string "KT" <|> string "MPS"
-    string " "
-    return (direction, toMPS unit speed, fmap (toMPS unit) gusts)
-
-
-----------------------------------------------------------------------
-
--- start actual parser
-
 -- data Keyword = Is | Function | Of | Colon | Comma | Stop | Exclamation | Question | Do | CurlOpen | CurlClose | AngOpen | AngClose | What | And | Assign | To
-
-whitespaceChar :: ReadP Char
-whitespaceChar =
-  satisfy (`elem` " \t\n\r")
-
-skipWhitespace :: ReadP ()
-skipWhitespace = skipMany whitespaceChar
-
-skipWhitespace1 :: ReadP ()
-skipWhitespace1 = skipMany1 whitespaceChar
-
-digit :: ReadP Char
-digit =
-  satisfy (`elem` ['0'..'9'])
-
-fraction :: ReadP Ratio
-fraction = do
-  a <- many1 digit
-  b <- option 1 $ skipWhitespace >> satisfy (=='/') >> skipWhitespace >> many1 digit
-  return $ read a % read b
-
-op :: ReadP Char
-op =
-  satisfy (`elem` "+-*/")
-
-
 
 data Function = Function [Ratio] Ratio -- coefficients, offset
 
 apply :: Function -> Ratio -> Function
 (Function coeffs offset) `apply` n = Function (tail coeffs) (offset + (head * n))
 
-
-
 instance Show Function where
   show (Function coeffs offset) =
     intercalate ", " (map display coeffs ++ display offset)
-
-
 
 data Op = Plus | Minus | Times | Divide
 data Value = Value Ratio | FValue Function [Value] | Subexpr [(Op, Value)]
@@ -128,10 +68,39 @@ instance Eval Value where
     Value $ snd $ evaluatePlusMinus $ evaluateMultDiv vs
 
 
+
+
+whitespaceChar :: ReadP Char
+whitespaceChar =
+  satisfy (`elem` " \t\n\r")
+
+skipWhitespace :: ReadP ()
+skipWhitespace = skipMany whitespaceChar
+
+skipWhitespace1 :: ReadP ()
+skipWhitespace1 = skipMany1 whitespaceChar
+
+digit :: ReadP Char
+digit =
+  satisfy (`elem` ['0'..'9'])
+
+fraction :: ReadP Ratio
+fraction = do
+  a <- many1 digit
+  b <- option 1 $ skipWhitespace >> satisfy (=='/') >> skipWhitespace >> many1 digit
+  return $ read a % read b
+
 opChain :: ReadP Value
 opChain = do
   v <- fraction
-  return v
+  skipWhitespace
+  vs <- many $ do
+    skipWhitespace
+    op <- satisfy (`elem` "+-*/")
+    skipWhitespace
+    v <- fraction
+    return (op, v)
+  return $ (Plus, v):vs
 
 expression :: ReadP Value
 expression =
