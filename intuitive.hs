@@ -3,6 +3,9 @@ import Text.ParserCombinators.ReadP
 -- data Keyword = Is | Function | Of | Colon | Comma | Stop | Exclamation | Question | Do | CurlOpen | CurlClose | AngOpen | AngClose | What | And | Assign | To
 
 data Function = Function [Ratio] Ratio -- coefficients, offset
+data Op = Plus | Minus | Times | Divide
+data Value = Value Ratio | FValue Function [Value] | Subexpr [(Op, Value)]
+
 
 apply :: Function -> Ratio -> Function
 (Function coeffs offset) `apply` n = Function (tail coeffs) (offset + (head * n))
@@ -10,9 +13,6 @@ apply :: Function -> Ratio -> Function
 instance Show Function where
   show (Function coeffs offset) =
     intercalate ", " (map display coeffs ++ display offset)
-
-data Op = Plus | Minus | Times | Divide
-data Value = Value Ratio | FValue Function [Value] | Subexpr [(Op, Value)]
 
 displayRatio :: Ratio -> String
 display r =
@@ -100,8 +100,11 @@ opChain = do
     skipWhitespace
     v <- fraction
     return (op, v)
-  return $ (Plus, v):vs
+  return $ Subexpr (Plus, v):vs
 
-expression :: ReadP Value
-expression =
+function :: ReadP Value
+function = 
+
+value :: ReadP Value
+value = opChain <|> function <|> fraction
   
